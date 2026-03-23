@@ -11,131 +11,197 @@ using namespace std;
 // 2 = Quick Sort based
 // 3 = Magic Fives (Median of Medians)
 // 4 = Probabilistic based on sampling
-const int SELECTED_ALGO = 2;
+const int SELECTED_ALGO = 4;
 
 // =====================================================================
 // 1. Insertion Sort Selection
 // =====================================================================
 int insertionSortSelect(vector<int> arr, int k) { // Pass by value to avoid modifying original
-    for (size_t i = 1; i < arr.size(); ++i) {
-        int key = arr[i];
-        int j = i - 1;
-        while (j >= 0 && arr[j] > key) {
-            arr[j + 1] = arr[j];
-            j = j - 1;
+    int n = arr.size();
+
+    for (int i = 0; i < k; i++){
+        for (int j = i + 1; j < n; j++){
+            if (arr[i] > arr[j]){
+                swap(arr[i], arr[j]);
+            }
         }
-        arr[j + 1] = key;
     }
+
     return arr[k - 1];
 }
 
 // =====================================================================
 // 2. QuickSelect (Randomized QuickSort-based)
 // =====================================================================
-int quickSelect(vector<int>& arr, int left, int right, int k) {
-    if (left == right) return arr[left - 1];
-
+int randomPartition(vector<int>& arr, int left, int right) { // Pick a random pivot    
     int pivotIndex = left + rand() % (right - left + 1);
-    int pivotValue = arr[pivotIndex];
-
-    swap(arr[pivotIndex], arr[right]);
-    int storeIndex = left;
-    for (int i = left; i < right; i++) {
-        if (arr[i] < pivotValue) {
-            swap(arr[i], arr[storeIndex]);
-            storeIndex++;
+    swap(arr[pivotIndex], arr[right]); // Move pivot to end
+    
+    int pivotValue = arr[right];
+    int i = left;
+    
+    for (int j = left; j < right; j++) {
+        if (arr[j] <= pivotValue) {
+            swap(arr[i], arr[j]);
+            i++;
         }
     }
-    swap(arr[storeIndex], arr[right]);
+    swap(arr[i], arr[right]); // Move pivot to its final place
+    return i;
+}
 
-    if (k == storeIndex) return arr[k - 1];
-    else if (k < storeIndex) return quickSelect(arr, left, storeIndex - 1, k);
-    else return quickSelect(arr, storeIndex + 1, right, k);
+int quickSelect(vector<int>& arr, int left, int right, int k) {
+    if (left == right) {
+        return arr[left];
+    }
+    
+    int pivotIndex = randomPartition(arr, left, right);
+    int targetIndex = k - 1;
+    
+    if (targetIndex == pivotIndex) {
+        return arr[pivotIndex];
+    } else if (targetIndex < pivotIndex) {
+        return quickSelect(arr, left, pivotIndex - 1, k);
+    } else {
+        return quickSelect(arr, pivotIndex + 1, right, k);
+    }
 }
 
 // =====================================================================
 // 3. Magic Fives (Median of Medians - Deterministic)
 // =====================================================================
-int findMedian(vector<int>& arr, int left, int n) {
-    sort(arr.begin() + left, arr.begin() + left + n);
-    return arr[left + n / 2 - 1];
+
+// Finds the median for a small subarray (up to 5 elements)
+int findSmallMedian(vector<int>& arr, int left, int right) {
+    sort(arr.begin() + left, arr.begin() + right + 1);
+    return arr[left + (right - left) / 2];
+}
+
+// Partitions the array around specific pivot value
+int partitionByValue(vector<int>& arr, int left, int right, int pivotValue) {
+    // Find the pivot value in the array and move it to the end
+    for (int i = left; i <= right; i++) {
+        if (arr[i] == pivotValue) {
+            swap(arr[i], arr[right]);
+            break;
+        }
+    }
+    
+    // Standard partitioning
+    int i = left;
+    for (int j = left; j < right; j++) {
+        if (arr[j] <= pivotValue) {
+            swap(arr[i], arr[j]);
+            i++;
+        }
+    }
+    swap(arr[i], arr[right]);
+    return i;
 }
 
 int magicFives(vector<int>& arr, int left, int right, int k) {
     int n = right - left + 1;
-    if (k >= 0 && k < n) {
-        vector<int> median((n + 4) / 5);
-        int i;
-        for (i = 0; i < n / 5; i++) {
-            median[i] = findMedian(arr, left + i * 5, 5);
-        }
-        if (i * 5 < n) {
-            median[i] = findMedian(arr, left + i * 5, n % 5);
-            i++;
-        }
-
-        int medOfMed = (i == 1) ? median[i - 1] : magicFives(median, 0, i - 1, i / 2);
-
-        int pos = left;
-        for (int j = left; j <= right; j++) {
-            if (arr[j] == medOfMed) {
-                swap(arr[j], arr[right]);
-                break;
-            }
-        }
-
-        int storeIndex = left;
-        for (int j = left; j < right; j++) {
-            if (arr[j] < medOfMed) {
-                swap(arr[j], arr[storeIndex]);
-                storeIndex++;
-            }
-        }
-        swap(arr[storeIndex], arr[right]);
-
-        if (storeIndex - left == k) return arr[storeIndex - 1];
-        if (storeIndex - left > k) return magicFives(arr, left, storeIndex - 1, k);
-        return magicFives(arr, storeIndex + 1, right, k - storeIndex + left - 1);
+    
+    // Base case: if there are 5 or fewer elements, sort and return the k-th element.
+    if (n <= 5) {
+        sort(arr.begin() + left, arr.begin() + right + 1);
+        return arr[k - 1]; 
     }
-    return -1;
+    
+    // Divide into groups of 5 and find their medians
+    vector<int> medians;
+    for (int i = 0; i < n / 5; i++) {
+        medians.push_back(findSmallMedian(arr, left + i * 5, left + i * 5 + 4));
+    }
+    
+    // Handle the remainder (if n is not divisible by 5, the last group is smaller)
+    if (n % 5 != 0) {
+        medians.push_back(findSmallMedian(arr, left + (n / 5) * 5, right));
+    }
+    
+    // Find the median of medians recursively. 
+    int mediansCount = medians.size();
+    int pivotValue = magicFives(medians, 0, mediansCount - 1, mediansCount / 2 + 1);
+    
+    // Partition the original array around the found pivot value
+    int pivotIndex = partitionByValue(arr, left, right, pivotValue);
+    
+    int targetIndex = k - 1;
+    
+    // Check which part of the array contains our target element
+    if (targetIndex == pivotIndex) {
+        return arr[pivotIndex];
+    } else if (targetIndex < pivotIndex) {
+        return magicFives(arr, left, pivotIndex - 1, k);
+    } else {
+        return magicFives(arr, pivotIndex + 1, right, k);
+    }
 }
 
 // =====================================================================
 // 4. Floyd-Rivest (Probabilistic Sampling)
 // =====================================================================
-int sign(double x) { return (x > 0) ? 1 : ((x < 0) ? -1 : 0); }
-
 int floydRivest(vector<int>& arr, int left, int right, int k) {
+    int targetIndex = k - 1;
+    
     while (right > left) {
+        // If the subarray is large enough, use sampling to find a good pivot
         if (right - left > 600) {
             double n = right - left + 1;
-            double i = k - left + 1;
-            double z = log(n);
-            double s = 0.5 * exp(2.0 * z / 3.0);
-            double sd = 0.5 * sqrt(z * s * (n - s) / n) * sign(i - n / 2.0);
-            int newLeft = max((double)left, k - i * s / n + sd);
-            int newRight = min((double)right, k + (n - i) * s / n + sd);
+            double i = targetIndex - left + 1;
+            
+            // Calculate the sample size and bounds using standard Floyd-Rivest math
+            double z = std::log(n);
+            double s = 0.5 * std::exp(2.0 * z / 3.0);
+            double sd = 0.5 * std::sqrt(z * s * (n - s) / n) * ((i - n / 2.0 < 0) ? -1.0 : 1.0);
+            
+            int newLeft = std::max(left, (int)(targetIndex - i * s / n + sd));
+            int newRight = std::min(right, (int)(targetIndex + (n - i) * s / n + sd));
+            
+            // Recursively run the algorithm on the selected sample
             floydRivest(arr, newLeft, newRight, k);
         }
-        int t = arr[k];
-        int i = left;
-        int j = right;
-        swap(arr[left], arr[k]);
-        if (arr[right] > t) swap(arr[right], arr[left]);
-        while (i < j) {
-            swap(arr[i], arr[j]);
-            i++; j--;
-            while (arr[i] < t) i++;
-            while (arr[j] > t) j--;
+        
+        // Use the element at targetIndex as our pivot 
+        // (it's now a highly accurate estimate thanks to the sampling step)
+        int pivotValue = arr[targetIndex];
+        
+        // Partition the array around the pivotValue
+        int pivotLoc = left;
+        
+        // Move pivot out of the way to the end
+        for (int j = left; j <= right; j++) {
+            if (arr[j] == pivotValue) {
+                swap(arr[j], arr[right]);
+                break;
+            }
         }
-        if (arr[left] == t) swap(arr[left], arr[j]);
-        else { j++; swap(arr[j], arr[right]); }
-        if (j <= k) left = j + 1;
-        if (k <= j) right = j - 1;
+        
+        // Standard partitioning
+        int i = left;
+        for (int j = left; j < right; j++) {
+            if (arr[j] <= pivotValue) {
+                swap(arr[i], arr[j]);
+                i++;
+            }
+        }
+        swap(arr[i], arr[right]); // Put pivot in its final sorted place
+        pivotLoc = i;
+        
+        // Narrow down the search range iteratively
+        if (pivotLoc == targetIndex) {
+            return arr[pivotLoc];
+        } else if (targetIndex < pivotLoc) {
+            right = pivotLoc - 1;
+        } else {
+            left = pivotLoc + 1;
+        }
     }
-
-    return arr[k - 1];
+    
+    // Base case when left == right
+    return arr[left];
 }
+
 
 // Wrapper function to find the k-th smallest element
 int kthSmallest(vector<int>& arr, int k) {
