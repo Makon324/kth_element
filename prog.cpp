@@ -11,12 +11,12 @@ using namespace std;
 // 2 = Quick Sort based
 // 3 = Magic Fives (Median of Medians)
 // 4 = Probabilistic based on sampling
-const int SELECTED_ALGO = 4;
+const int SELECTED_ALGO = 3;
 
 // =====================================================================
 // 1. Insertion Sort Selection
 // =====================================================================
-int insertionSortSelect(vector<int> arr, int k) { // Pass by value to avoid modifying original
+int insertionSortSelect(vector<int>& arr, int k) {
     int n = arr.size();
 
     for (int i = 0; i < k; i++){
@@ -71,10 +71,10 @@ int quickSelect(vector<int>& arr, int left, int right, int k) {
 // 3. Magic Fives (Median of Medians - Deterministic)
 // =====================================================================
 
-// Finds the median for a small subarray (up to 5 elements)
-int findSmallMedian(vector<int>& arr, int left, int right) {
+// Sorts a small segment and returns the index of the median (instead of the value itself)
+int findSmallMedianIndex(vector<int>& arr, int left, int right) {
     sort(arr.begin() + left, arr.begin() + right + 1);
-    return arr[left + (right - left) / 2];
+    return left + (right - left) / 2;
 }
 
 // Partitions the array around specific pivot value
@@ -102,33 +102,40 @@ int partitionByValue(vector<int>& arr, int left, int right, int pivotValue) {
 int magicFives(vector<int>& arr, int left, int right, int k) {
     int n = right - left + 1;
     
-    // Base case: if there are 5 or fewer elements, sort and return the k-th element.
+    // Base case: if there are 5 or fewer elements, sort and return the k-th element
     if (n <= 5) {
         sort(arr.begin() + left, arr.begin() + right + 1);
         return arr[k - 1]; 
     }
     
-    // Divide into groups of 5 and find their medians
-    vector<int> medians;
-    for (int i = 0; i < n / 5; i++) {
-        medians.push_back(findSmallMedian(arr, left + i * 5, left + i * 5 + 4));
+    // Calculate the number of 5-element groups (ceiling of division)
+    int numGroups = (n + 4) / 5;
+    
+    for (int i = 0; i < numGroups; i++) {
+        int groupLeft = left + i * 5;
+        // Safeguard for the last group, which might have fewer than 5 elements
+        int groupRight = min(left + i * 5 + 4, right); 
+        
+        int medianIndex = findSmallMedianIndex(arr, groupLeft, groupRight);
+        
+        // Move the found median to the beginning of the current range
+        swap(arr[left + i], arr[medianIndex]);
     }
     
-    // Handle the remainder (if n is not divisible by 5, the last group is smaller)
-    if (n % 5 != 0) {
-        medians.push_back(findSmallMedian(arr, left + (n / 5) * 5, right));
-    }
+    // Now all medians are stored in the arr array at positions from 'left' to 'left + numGroups - 1'.
+    // We look for the "median of medians" by calling magicFives only for this small prefix.
+    int medianOfMediansIndex = left + numGroups / 2; 
     
-    // Find the median of medians recursively. 
-    int mediansCount = medians.size();
-    int pivotValue = magicFives(medians, 0, mediansCount - 1, mediansCount / 2 + 1);
+    // We look for the element that, after sorting, would be at medianOfMediansIndex. 
+    // Since k in the magicFives function is 1-based, we pass index + 1.
+    int pivotValue = magicFives(arr, left, left + numGroups - 1, medianOfMediansIndex + 1);
     
-    // Partition the original array around the found pivot value
+    // Partition the array around the found pivot value (using your partitionByValue function)
     int pivotIndex = partitionByValue(arr, left, right, pivotValue);
     
     int targetIndex = k - 1;
     
-    // Check which part of the array contains our target element
+    // Standard QuickSelect logic
     if (targetIndex == pivotIndex) {
         return arr[pivotIndex];
     } else if (targetIndex < pivotIndex) {
